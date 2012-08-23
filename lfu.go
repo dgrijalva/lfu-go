@@ -3,12 +3,14 @@ package lfu
 import (
 	"container/list"
 	"fmt"
+	"sync"
 )
 
 type Cache struct {
 	values map[string]*cacheEntry
 	freqs  *list.List
 	len    int
+	lock   *sync.Mutex
 }
 
 type cacheEntry struct {
@@ -26,10 +28,13 @@ func New() *Cache {
 	c := new(Cache)
 	c.values = make(map[string]*cacheEntry)
 	c.freqs = list.New()
+	c.lock = new(sync.Mutex)
 	return c
 }
 
 func (c *Cache) Get(key string) interface{} {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	if e, ok := c.values[key]; ok {
 		c.increment(e)
 		return e.value
@@ -38,6 +43,8 @@ func (c *Cache) Get(key string) interface{} {
 }
 
 func (c *Cache) Set(key string, value interface{}) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	if e, ok := c.values[key]; ok {
 		// value already exists for key.  overwrite
 		e.value = value
@@ -54,10 +61,14 @@ func (c *Cache) Set(key string, value interface{}) {
 }
 
 func (c *Cache) Len() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	return c.len
 }
 
 func (c *Cache) Evict(count int) int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	var evicted int
 	for i := 0; i < count; {
 		if place := c.freqs.Front(); place != nil {
