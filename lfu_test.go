@@ -1,6 +1,9 @@
 package lfu
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestLFU(t *testing.T) {
 	c := New()
@@ -33,5 +36,18 @@ func TestLFU(t *testing.T) {
 	}
 	if evicted != 1 {
 		t.Errorf("Number of evicted items is wrong: %v != 1", evicted)
+	}
+}
+
+func TestBoundsMgmt(t *testing.T) {
+	c := New()
+	c.UpperBound = 10
+	c.LowerBound = 5
+
+	for i := 0; i < 100; i++ {
+		c.Set(fmt.Sprintf("%v", i), i)
+	}
+	if c.Len() > 10 {
+		t.Errorf("Bounds management failed to evict properly: %v", c.Len())
 	}
 }

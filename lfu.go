@@ -2,15 +2,19 @@ package lfu
 
 import (
 	"container/list"
-	"fmt"
 	"sync"
 )
 
 type Cache struct {
-	values map[string]*cacheEntry
-	freqs  *list.List
-	len    int
-	lock   *sync.Mutex
+	// If len > UpperBound, cache will automatically evict
+	// down to LowerBound.  If either value is 0, this behavior
+	// is disabled.
+	UpperBound int
+	LowerBound int
+	values     map[string]*cacheEntry
+	freqs      *list.List
+	len        int
+	lock       *sync.Mutex
 }
 
 type cacheEntry struct {
@@ -57,6 +61,12 @@ func (c *Cache) Set(key string, value interface{}) {
 		c.values[key] = e
 		c.increment(e)
 		c.len++
+		// bounds mgmt
+		if c.UpperBound > 0 && c.LowerBound > 0 {
+			if c.len > c.UpperBound {
+				c.evict(c.len - c.LowerBound)
+			}
+		}
 	}
 }
 
@@ -69,6 +79,12 @@ func (c *Cache) Len() int {
 func (c *Cache) Evict(count int) int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	return c.evict(count)
+}
+
+func (c *Cache) evict(count int) int {
+	// No lock here so it can be called
+	// from within the lock (during Set)
 	var evicted int
 	for i := 0; i < count; {
 		if place := c.freqs.Front(); place != nil {
@@ -100,12 +116,6 @@ func (c *Cache) increment(e *cacheEntry) {
 		nextPlace = currentPlace.Next()
 	}
 
-	if nextPlace != nil {
-		fmt.Printf("%v Looking for: %v with freq %v\n", e.key, nextPlace.Value, nextFreq)
-	} else {
-		fmt.Printf("%v Looking for: %v with freq %v\n", e.key, nextPlace, nextFreq)
-	}
-
 	if nextPlace == nil || nextPlace.Value.(*listEntry).freq != nextFreq {
 		// create a new list entry
 		li := new(listEntry)
@@ -119,7 +129,6 @@ func (c *Cache) increment(e *cacheEntry) {
 	}
 	e.freqNode = nextPlace
 	nextPlace.Value.(*listEntry).entries[e] = 1
-	fmt.Println(nextPlace.Value)
 	if currentPlace != nil {
 		// remove from current position
 		c.remEntry(currentPlace, e)
