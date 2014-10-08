@@ -5,16 +5,22 @@ import (
 	"sync"
 )
 
+type Eviction struct {
+	Key   string
+	Value interface{}
+}
+
 type Cache struct {
 	// If len > UpperBound, cache will automatically evict
 	// down to LowerBound.  If either value is 0, this behavior
 	// is disabled.
-	UpperBound int
-	LowerBound int
-	values     map[string]*cacheEntry
-	freqs      *list.List
-	len        int
-	lock       *sync.Mutex
+	UpperBound      int
+	LowerBound      int
+	values          map[string]*cacheEntry
+	freqs           *list.List
+	len             int
+	lock            *sync.Mutex
+	EvictionChannel chan<- Eviction
 }
 
 type cacheEntry struct {
@@ -90,6 +96,12 @@ func (c *Cache) evict(count int) int {
 		if place := c.freqs.Front(); place != nil {
 			for entry, _ := range place.Value.(*listEntry).entries {
 				if i < count {
+					if c.EvictionChannel != nil {
+						c.EvictionChannel <- Eviction{
+							Key:   entry.key,
+							Value: entry.value,
+						}
+					}
 					delete(c.values, entry.key)
 					c.remEntry(place, entry)
 					evicted++
