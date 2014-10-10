@@ -51,3 +51,18 @@ func TestBoundsMgmt(t *testing.T) {
 		t.Errorf("Bounds management failed to evict properly: %v", c.Len())
 	}
 }
+
+func TestEviction(t *testing.T) {
+	ch := make(chan Eviction, 1)
+
+	c := New()
+	c.EvictionChannel = ch
+	c.Set("a", "b")
+	c.Evict(1)
+
+	ev := <-ch
+
+	if ev.Key != "a" || ev.Value.(string) != "b" {
+		t.Error("Incorrect item")
+	}
+}
