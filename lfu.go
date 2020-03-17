@@ -19,7 +19,7 @@ type Cache struct {
 	values          map[string]*cacheEntry
 	freqs           *list.List
 	len             int
-	lock            *sync.Mutex
+	lock            sync.Mutex
 	EvictionChannel chan<- Eviction
 }
 
@@ -38,7 +38,6 @@ func New() *Cache {
 	c := new(Cache)
 	c.values = make(map[string]*cacheEntry)
 	c.freqs = list.New()
-	c.lock = new(sync.Mutex)
 	return c
 }
 
